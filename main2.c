@@ -20,7 +20,8 @@ int main(void)
     configSPI();
     configTimers();
     createQueue(&buffer);
-    __bis_SR_register(GIE+CPUOFF);
+    __no_operation();
+    __bis_SR_register(GIE);
     while(1);
     return 0;
 }
@@ -83,10 +84,7 @@ void configSPI(void)
     P1SEL2 |= BIT6 + BIT7 + BIT5;
 
     UCB0CTL1 &= ~UCSWRST;
-    IE2 |= UCB0RXIE;
-    IE2 |= UCB0TXIE;
-
-
+    IE2 |= UCB0RXIE +  UCA0TXIE;
 }
 void Send_UART(uint8_t data) {
 //    while(!(IFG2 & UCA0TXIFG));
@@ -97,8 +95,11 @@ void Send_UART(uint8_t data) {
 void Send_UART_word(char* word)
 {
     while(*word) {
+//        IFG2 |= UCA0TXIFG;
         Send_UART(*word);
+
         word++; // Lay ky tu tiep theo
+//        IFG2 &= ~UCA0TXIFG;
     }
 }
 void configTimers(void)
@@ -110,44 +111,13 @@ void configTimers(void)
 
 #pragma vector=USCIAB0RX_VECTOR
 __interrupt void USCI0RX_ISR(void) {
-    uint8_t rxtmp;
-    if (IFG2 & UCB0RXIFG)
-    {
-        rxtmp = UCB0RXBUF;
-        int status = enqueue(&buffer, rxtmp) ;
-        if(status > 0)
-        {
-            IFG2 |= UCA0TXIFG;
-//            IE2 |= UCA0TXIE;
-        }
-        else if (status < 0)
-            UCB0TXBUF = -1;
-        else
-        {
-            //what if
-//            IE2 &=~UCA0RXIE;
-        }
-    }
+
 
 
 }
 #pragma vector = USCIAB0TX_VECTOR
 __interrupt void USCI0TX_ISR(void)
 {
-    uint8_t txtmp;
-    if(IFG2 & UCA0TXIFG)
-       {
-           int status = dequeue(&buffer,&txtmp);
-           if(status > 0) UCA0TXBUF = txtmp;
-           else if(status == 0)
-           {
-               IFG2 &= ~UCA0TXIFG;
-//               IE2 &=~ UCA0TXIE;
-           }
-           else{
-               //what if send wrong data ??
-           }
-       }
 
 }
 #pragma vector = TIMER0_A0_VECTOR
@@ -161,15 +131,16 @@ __interrupt void Timer_A_ISR(void)
 //    Send_UART_word("hello world !\n");
 
     //__bis_SR_register(CPUOFF);
-    __bic_SR_register_on_exit(CPUOFF);
+//    __bic_SR_register_on_exit(CPUOFF);
 }
 #pragma vector = PORT1_VECTOR
 __interrupt void Port1_ISR(void)
 {
-    IE2 |= UCA0TXIE;
-    Send_UART_word("Waiting for data from master!...\n");
-    IE2 |= UCB0RXIE;
     IE2 &= ~UCA0TXIE;
+
+    Send_UART_word("Waiting for data from master!...\n");
+    IE2 |= UCA0TXIE;
+//    IE2 &= ~UCA0TXIE;
     P1IFG &= ~BIT3;
 
 }
