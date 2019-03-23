@@ -7,9 +7,9 @@
 struct TX_BUF
 {
     char *buffer;
-    uint8_t size;
+    uint16_t size;
 };
-int tmp;
+int tmp = 0;
 struct TX_BUF txbuf;
 uint8_t time_count=0;
 void configClocks(void);
@@ -51,7 +51,7 @@ void configIO(void)
     P1REN |= BIT3  ;
 
     P1IE |= BIT3;
-//    P1OUT |= BIT3;
+
     P1IFG &= ~BIT3;
 }
 
@@ -70,7 +70,8 @@ void configSPI(void)
     P1SEL2 |= BIT1 + BIT2 + BIT4;
 
     UCA0CTL1 &= ~UCSWRST;
-//    state = SEND;
+
+    IE2 |= UCA0TXIE + UCA0RXIE;
 }
 void Send_UART(uint8_t data) {
 //    while(UCA0STAT & UCBUSY);
@@ -85,7 +86,6 @@ void Send_UART_word(char* word)
     while(!(IFG2 & UCA0TXIFG));
     txbuf.buffer = word;
     txbuf.size = strlen(word);
-    IE2 |= UCA0TXIE;
 }
 void configTimers(void)
 {
@@ -102,11 +102,10 @@ __interrupt void Timer_A_ISR(void)
     else{
         P1OUT ^= 0x01;
                   // toggle P1.0
+        IFG2 |= UCA0TXIFG;
         Send_UART_word("hello world !\n");
         time_count = 0;
     }
-    //__bis_SR_register(CPUOFF);
-//    __bic_SR_register_on_exit(CPUOFF);
 }
 #pragma vector = PORT1_VECTOR;
 __interrupt void Port1_ISR(void)
@@ -125,27 +124,36 @@ __interrupt void USCI_TX_ISR (void)
     {
         if(txbuf.size){
         UCA0TXBUF = *txbuf.buffer;
-        IE2 |= UCA0RXIE;
-        while(!(IFG2 & UCA0RXIFG));
-//        int tmp = UCA0RXBUF;
-        if(tmp==0) time_count--;
-        else if(tmp >0)
+
+        IFG2 |= UCA0RXIFG;
+        __no_operation();
+        //Nếu slave chưa gửi xog, đầy
+        // đợi 10ms
+        if(tmp == -1) time_count--;
+        // Nếu slave báo nhận lỗi,
+        // Gửi lại kí tự trước
+        else if(tmp == 1)
+        {
+            txbuf.buffer--;
+            txbuf.size++;
+
+        }
+        // Mặc định tmp trả về 0xFF hoặc khi slave báo
+        // thành công thì tiếp tục gửi
+        else if (tmp == 0xFF || tmp == 0)
         {
             txbuf.buffer++;
             txbuf.size--;
         }
         else
         {
-            txbuf.buffer--;
-            txbuf.size++;
+            //what if RXBUF receive wrong data ?
         }
-//        IFG2 &= ~UCA0RXIFG;
-//        IE2 &= ~UCA0RXIE;
         }
         else
         {
-//            IFG2 &= ~UCA0TXIFG;
-            IE2 &= ~UCA0TXIE;
+            IFG2 &= ~UCA0TXIFG;
+
         }
     }
 }
@@ -154,6 +162,5 @@ __interrupt void USCI_RX_ISR (void)
 {
     if (IFG2 & UCA0RXIFG)
     tmp = UCA0RXBUF;
-//    IE2 &= ~UCA0RXIE;
     IFG2 &= ~UCA0RXIFG;
 }
