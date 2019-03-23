@@ -123,46 +123,10 @@ __interrupt void Port1_ISR(void)
 #pragma vector = USCIAB0TX_VECTOR
 __interrupt void USCI_TX_ISR (void)
 {
-    if(IFG2 & UCA0TXIFG)
-    {
-        if(txbuf.size){
-        UCA0TXBUF = *txbuf.buffer;
-//        IE2 |= UCA0RXIE;
-//        while(!(IFG2 & UCA0RXIFG));
-        IFG2 |= UCA0RXIFG;
-//        int tmp = UCA0RXBUF;
-        __no_operation();
-        if(tmp == -1) time_count--;
-        else if(tmp == -2)
-        {
-            txbuf.buffer--;
-            txbuf.size++;
-
-        }
-        else if (tmp >= 0)
-        {
-            txbuf.buffer++;
-            txbuf.size--;
-        }
-        else
-        {
-            //what if RXBUF receive wrong data ?
-        }
-//        IFG2 &= ~UCA0RXIFG;
-//        IE2 &= ~UCA0RXIE;
-        }
-        else
-        {
-            IFG2 &= ~UCA0TXIFG;
-//            IE2 &= ~UCA0TXIE;
-        }
-    }
+   
 }
 #pragma vector = USCIAB0RX_VECTOR
 __interrupt void USCI_RX_ISR (void)
 {
-    if (IFG2 & UCA0RXIFG)
-    tmp = UCA0RXBUF;
-//    IE2 &= ~UCA0RXIE;
-    IFG2 &= ~UCA0RXIFG;
+
 }
